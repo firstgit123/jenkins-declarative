@@ -1,0 +1,58 @@
+pipeline {
+    agent any
+	  tools {
+	  maven 'maven-3.8.3'
+	}
+	triggers {
+	  pollSCM('* * * * *')
+	}
+	options {
+	  timestamps()
+      buildDiscarder(logRotator(artifactDaysToKeepStr: '5', artifactNumToKeepStr: '5', daysToKeepStr: '5', numToKeepStr: '5'))
+	}
+	stages {
+	  stage('CheckOutCode') {
+	    steps {
+	      git credentialsId: 'b7c2ebe3-7fe6-4b16-badf-93d4e5278b8f', url: 'https://github.com/firstgit123/maven-web-application.git'
+	    }
+	  }
+	  stage('Build') {
+	    steps {
+	      sh "mvn clean package"
+	    }
+	  }
+	  stage('SonarQubereport') {
+	    steps {
+	      sh "mvn sonar:sonar"
+	    }
+	  }
+	  stage('Nexusartifactbackup') {
+ 	    steps {
+	      sh "mvn deploy"
+	    }
+	  }
+	  stage('Deploytoapache') {
+	     steps {
+	       sshagent(['b66c42a8-e56e-404c-aa7c-5081b65a2b4f']) {
+	       sh "scp -o StrictHostKeyChecking=no /var/lib/jenkins/workspace/declarative-pipeline/target/maven-web-application.war ec2-user@ip-172-31-27-142:/opt/apache-tomcat-9.0.83/webapps/"
+	       }
+	     }
+	  }
+	}
+        post {
+	  success {
+	    emailext body: '''Build is success
+
+	    Regards,
+            Sasidhar k ''', subject: 'maven-web-app status', to: 'sashi4030@gmail.com'
+	  }
+	  failure {
+	    emailext body: '''Build failed
+
+            Regards,
+            Sasidhar k ''', subject: 'maven-web-app status', to: 'sashi4030@gmail.com'
+	  }
+
+        }
+
+}
